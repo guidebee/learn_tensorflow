@@ -119,14 +119,17 @@ autoencoder.fit(x_train, y_train_matrix,
                 shuffle=True,
                 validation_data=(x_test, y_test_matrix))
 
-train_encoded_imgs = autoencoder.encoder(x_train).numpy()
-train_decoded_imgs = autoencoder.decoder(train_encoded_imgs).numpy()
+# train_encoded_imgs = autoencoder.encoder(x_train).numpy()
+# train_decoded_imgs = autoencoder.decoder(train_encoded_imgs).numpy()
+# # train_decoded_imgs = (train_decoded_imgs > 0.5).astype(int)
+#
+# test_encoded_imgs = autoencoder.encoder(x_test).numpy()
+# test_decoded_imgs = autoencoder.decoder(test_encoded_imgs).numpy()
+# # test_decoded_imgs = (test_decoded_imgs > 0.5).astype(int)
+train_decoded_imgs = autoencoder(x_train).numpy()
 # train_decoded_imgs = (train_decoded_imgs > 0.5).astype(int)
-
-test_encoded_imgs = autoencoder.encoder(x_test).numpy()
-test_decoded_imgs = autoencoder.decoder(test_encoded_imgs).numpy()
+test_decoded_imgs = autoencoder(x_test).numpy()
 # test_decoded_imgs = (test_decoded_imgs > 0.5).astype(int)
-
 
 n = 10
 plt.figure(figsize=(20, 4))
@@ -150,71 +153,70 @@ plt.show()
 
 
 # use nuro network to predict
-
-class MyModel(Model):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = Conv2D(32, 3, activation='relu')
-        self.flatten = Flatten()
-        self.d1 = Dense(128, activation='relu')
-        self.d2 = Dense(10)
-
-    def call(self, x):
-        x = self.conv1(x)
-        x = self.flatten(x)
-        x = self.d1(x)
-        return self.d2(x)
-
-
-# Create an instance of the model
-model = MyModel()
-
-loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-optimizer = tf.keras.optimizers.Adam()
-
-train_loss = tf.keras.metrics.Mean(name='train_loss')
-train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
-
-test_loss = tf.keras.metrics.Mean(name='test_loss')
-test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
-
-
-@tf.function
-def train_step(images, labels):
-    with tf.GradientTape() as tape:
-        # training=True is only needed if there are layers with different
-        # behavior during training versus inference (e.g. Dropout).
-        predictions = model(images, training=True)
-        loss = loss_object(labels, predictions)
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
-    train_loss(loss)
-    train_accuracy(labels, predictions)
-
-
-@tf.function
-def test_step(images, labels):
-    # training=False is only needed if there are layers with different
-    # behavior during training versus inference (e.g. Dropout).
-    predictions = model(images, training=False)
-    t_loss = loss_object(labels, predictions)
-
-    test_loss(t_loss)
-    test_accuracy(labels, predictions)
-
-
-train_decoded_imgs_ds = train_decoded_imgs[..., tf.newaxis].astype("float32")
-test_decoded_imgs_ds = test_decoded_imgs[..., tf.newaxis].astype("float32")
-
-EPOCHS = 5
-train_ds = tf.data.Dataset.from_tensor_slices(
-    (train_decoded_imgs_ds, y_train)).shuffle(10000).batch(32)
-
-test_ds = tf.data.Dataset.from_tensor_slices((test_decoded_imgs_ds, y_test)).batch(32)
-
-
+#
+# class MyModel(Model):
+#     def __init__(self):
+#         super().__init__()
+#         self.conv1 = Conv2D(32, 3, activation='relu')
+#         self.flatten = Flatten()
+#         self.d1 = Dense(128, activation='relu')
+#         self.d2 = Dense(10)
+#
+#     def call(self, x):
+#         x = self.conv1(x)
+#         x = self.flatten(x)
+#         x = self.d1(x)
+#         return self.d2(x)
+#
+#
+# # Create an instance of the model
+# model = MyModel()
+#
+# loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+#
+# optimizer = tf.keras.optimizers.Adam()
+#
+# train_loss = tf.keras.metrics.Mean(name='train_loss')
+# train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy')
+#
+# test_loss = tf.keras.metrics.Mean(name='test_loss')
+# test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
+#
+#
+# @tf.function
+# def train_step(images, labels):
+#     with tf.GradientTape() as tape:
+#         # training=True is only needed if there are layers with different
+#         # behavior during training versus inference (e.g. Dropout).
+#         predictions = model(images, training=True)
+#         loss = loss_object(labels, predictions)
+#     gradients = tape.gradient(loss, model.trainable_variables)
+#     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+#
+#     train_loss(loss)
+#     train_accuracy(labels, predictions)
+#
+#
+# @tf.function
+# def test_step(images, labels):
+#     # training=False is only needed if there are layers with different
+#     # behavior during training versus inference (e.g. Dropout).
+#     predictions = model(images, training=False)
+#     t_loss = loss_object(labels, predictions)
+#
+#     test_loss(t_loss)
+#     test_accuracy(labels, predictions)
+#
+#
+# train_decoded_imgs_ds = train_decoded_imgs[..., tf.newaxis].astype("float32")
+# test_decoded_imgs_ds = test_decoded_imgs[..., tf.newaxis].astype("float32")
+#
+# EPOCHS = 5
+# train_ds = tf.data.Dataset.from_tensor_slices(
+#     (train_decoded_imgs_ds, y_train)).shuffle(10000).batch(32)
+#
+# test_ds = tf.data.Dataset.from_tensor_slices((test_decoded_imgs_ds, y_test)).batch(32)
+#
 # for epoch in range(EPOCHS):
 #     # Reset the metrics at the start of the next epoch
 #     train_loss.reset_states()
@@ -278,10 +280,4 @@ for index in tqdm(range(test_size)):
         # print(f"index={index}, p={p[0]}, test_labels={y_test[index]}")
 
 print(error_index)
-# with tqdm(test_ds) as t:
-#     t.colour = 'red'
-#     for test_images, test_labels in t:
-#         p = direct_model(test_images)
-#         diff = tf.math.equal(p, labels)
-#         accuracy = tf.math.reduce_mean(tf.cast(diff, tf.float32))
-#         t.write(f'accuracy={accuracy}')
+print(f"Model accuracy = {(test_size - len(error_index)) / test_size * 100}%")
