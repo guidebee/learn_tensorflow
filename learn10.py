@@ -10,6 +10,8 @@ from tqdm import tqdm
 from convert_hz24_to_numpy import convert_hz24_to_numpy
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train = x_train[..., tf.newaxis].astype("float32")
+x_test = x_test[..., tf.newaxis].astype("float32")
 
 x_train = x_train.astype('float32') / 255.
 x_test = x_test.astype('float32') / 255.
@@ -46,6 +48,9 @@ y_test_matrix = np.zeros((y_test.shape[0], 28, 28))
 for i in range(y_test.shape[0]):
     y_test_matrix[i] = number_matrix[y_test[i]]
 
+y_train_matrix = y_train_matrix[..., tf.newaxis]
+y_test_matrix = y_test_matrix[..., tf.newaxis]
+
 
 # class Autoencoder(Model):
 #     def __init__(self, latent_dim, shape):
@@ -71,25 +76,42 @@ for i in range(y_test.shape[0]):
 # latent_dim = 128
 # autoencoder = Autoencoder(latent_dim, shape)
 # autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
-input_img = tf.keras.Input(shape=(28, 28, 1))
-x = layers.Conv2D(16, (3, 3), activation='relu', padding='same')(input_img)
-x = layers.MaxPooling2D((2, 2), padding='same')(x)
-x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-x = layers.MaxPooling2D((2, 2), padding='same')(x)
-x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-encoded = layers.MaxPooling2D((2, 2), padding='same')(x)
 
-# at this point the representation is (4, 4, 8) i.e. 128-dimensional
 
-x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(encoded)
-x = layers.UpSampling2D((2, 2))(x)
-x = layers.Conv2D(8, (3, 3), activation='relu', padding='same')(x)
-x = layers.UpSampling2D((2, 2))(x)
-x = layers.Conv2D(16, (3, 3), activation='relu')(x)
-x = layers.UpSampling2D((2, 2))(x)
-decoded = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+class Autoencoder(Model):
+    def __init__(self, latent_dim, shape):
+        super(Autoencoder, self).__init__()
+        self.latent_dim = latent_dim
+        self.shape = shape
+        self.encoder = tf.keras.Sequential([
+            layers.Conv2D(16, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same'),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same'),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same')
+        ])
+        self.decoder = tf.keras.Sequential([
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(16, (3, 3), activation='relu'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')
+        ])
 
-autoencoder = tf.keras.Model(input_img, decoded)
+    def call(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
+
+
+shape = x_test.shape[1:]
+latent_dim = 128
+autoencoder = Autoencoder(latent_dim, shape)
+# autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
+
 autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
 autoencoder.fit(x_train, y_train_matrix,
@@ -104,6 +126,7 @@ train_decoded_imgs = autoencoder.decoder(train_encoded_imgs).numpy()
 test_encoded_imgs = autoencoder.encoder(x_test).numpy()
 test_decoded_imgs = autoencoder.decoder(test_encoded_imgs).numpy()
 # test_decoded_imgs = (test_decoded_imgs > 0.5).astype(int)
+
 
 n = 10
 plt.figure(figsize=(20, 4))
@@ -191,6 +214,7 @@ train_ds = tf.data.Dataset.from_tensor_slices(
 
 test_ds = tf.data.Dataset.from_tensor_slices((test_decoded_imgs_ds, y_test)).batch(32)
 
+
 # for epoch in range(EPOCHS):
 #     # Reset the metrics at the start of the next epoch
 #     train_loss.reset_states()
@@ -225,7 +249,7 @@ test_ds = tf.data.Dataset.from_tensor_slices((test_decoded_imgs_ds, y_test)).bat
 class DirectModel(Model):
     def call(self, x):
         size = x.shape[0]
-        ret = np.one(size)
+        ret = np.ones(size)
         for index in range(size):
             image = tf.squeeze(x[index])
             predictions = np.ones(10)
@@ -246,12 +270,12 @@ test_decoded_imgs_dir = []
 
 for index in tqdm(range(test_size)):
     test_images, test_labels = test_decoded_imgs[index], y_test[index]
-    test_images = test_images[tf.newaxis,...]
+    test_images = tf.squeeze(test_images)
+    test_images = test_images[tf.newaxis, ...,]
     p = direct_model(test_images)
     if p[0] != test_labels:
         error_index.append(index)
         # print(f"index={index}, p={p[0]}, test_labels={y_test[index]}")
-
 
 print(error_index)
 # with tqdm(test_ds) as t:
