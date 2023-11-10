@@ -23,8 +23,10 @@ image_numbers = np.zeros((28, 280))
 image_numbers_24 = convert_hz24_to_numpy("０１２３４５６７８９０")
 for k in range(10):
     # generate random number from 0 to 2
-    pox = np.random.randint(0, 5)
-    poy = np.random.randint(0, 5)
+    # pox = np.random.randint(0, 5)
+    # poy = np.random.randint(0, 5)
+    pox = 2
+    poy = 2
 
     for i in range(24):
         for j in range(24):
@@ -87,21 +89,22 @@ class Autoencoder(Model):
         self.latent_dim = latent_dim
         self.shape = shape
         self.encoder = tf.keras.Sequential([
-            layers.Conv2D(16, 3, activation="relu"),
-            layers.Conv2D(32, 3, activation="relu"),
-            layers.MaxPooling2D(3),
-            layers.Conv2D(32, 3, activation="relu"),
-            layers.Conv2D(16, 3, activation="relu"),
-            layers.GlobalMaxPooling2D()
+            layers.Conv2D(16, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same'),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same'),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.MaxPooling2D((2, 2), padding='same')
 
         ])
         self.decoder = tf.keras.Sequential([
-            layers.Reshape((4, 4, 1)),
-            layers.Conv2DTranspose(16, 3, activation="relu"),
-            layers.Conv2DTranspose(32, 3, activation="relu"),
-            layers.UpSampling2D(3),
-            layers.Conv2DTranspose(16, 3, activation="relu"),
-            layers.Conv2DTranspose(1, 3, activation="relu")
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(16, (3, 3), activation='relu'),
+            layers.UpSampling2D((2, 2)),
+            layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')
 
         ])
 
