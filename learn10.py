@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, Flatten, Dense
-from tensorflow.keras import layers, losses
+from tensorflow.keras import layers
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Model
 from tqdm import tqdm
@@ -23,9 +22,13 @@ print(x_test.shape)
 image_numbers = np.zeros((28, 280))
 image_numbers_24 = convert_hz24_to_numpy("０１２３４５６７８９０")
 for k in range(10):
+    # generate random number from 0 to 2
+    pox = np.random.randint(0, 5)
+    poy = np.random.randint(0, 5)
+
     for i in range(24):
         for j in range(24):
-            image_numbers[i + 2, j + 2 + k * 28] = image_numbers_24[i, j + k * 24]
+            image_numbers[i + pox, j + poy + k * 28] = image_numbers_24[i, j + k * 24]
 
 number_0 = image_numbers[:, :28]
 number_1 = image_numbers[:, 28:56]
@@ -84,23 +87,25 @@ class Autoencoder(Model):
         self.latent_dim = latent_dim
         self.shape = shape
         self.encoder = tf.keras.Sequential([
-            layers.Conv2D(16, (3, 3), activation='relu', padding='same'),
-            layers.MaxPooling2D((2, 2), padding='same'),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
-            layers.MaxPooling2D((2, 2), padding='same'),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
-            layers.MaxPooling2D((2, 2), padding='same')
+            layers.Conv2D(16, 3, activation="relu"),
+            layers.Conv2D(32, 3, activation="relu"),
+            layers.MaxPooling2D(3),
+            layers.Conv2D(32, 3, activation="relu"),
+            layers.Conv2D(16, 3, activation="relu"),
+            layers.GlobalMaxPooling2D()
+
         ])
         self.decoder = tf.keras.Sequential([
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
-            layers.UpSampling2D((2, 2)),
-            layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
-            layers.UpSampling2D((2, 2)),
-            layers.Conv2D(16, (3, 3), activation='relu'),
-            layers.UpSampling2D((2, 2)),
-            layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')
+            layers.Reshape((4, 4, 1)),
+            layers.Conv2DTranspose(16, 3, activation="relu"),
+            layers.Conv2DTranspose(32, 3, activation="relu"),
+            layers.UpSampling2D(3),
+            layers.Conv2DTranspose(16, 3, activation="relu"),
+            layers.Conv2DTranspose(1, 3, activation="relu")
+
         ])
 
+    @tf.function
     def call(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
