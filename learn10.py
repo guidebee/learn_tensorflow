@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import keras
-from tensorflow.keras import layers, losses
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.models import Model
+from keras import layers, losses
+from keras.datasets import mnist
+from keras.models import Model
 from tqdm import tqdm
 import os
 
