@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.keras import layers
+from keras import layers
 
 # Make NumPy printouts easier to read.
 np.set_printoptions(precision=3, suppress=True)

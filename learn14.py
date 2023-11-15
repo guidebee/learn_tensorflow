@@ -61,3 +61,23 @@ with tf.device("CPU:0"):
         "Predicted result is: %s, target result is: %s" % (result.numpy(), sample_label)
     )
     plt.imshow(sample, cmap=plt.get_cmap("gray"))
+
+
+# Instantiate the ImageDataGenerator class (don't forget to set the rescale argument)
+train_datagen = ImageDataGenerator(rescale=1. / 255)
+# Pass in the appropriate arguments to the flow_from_directory method
+train_generator = train_datagen.flow_from_directory(
+    directory=r"./train",
+    target_size=(256, 256),
+    color_mode="rgb",
+    batch_size=32,
+    class_mode="categorical",
+    shuffle=True,
+    seed=42
+)
+
+# DEFINE A KERAS MODEL TO CLASSIFY CATS V DOGS  USE AT LEAST 3 CONVOLUTION LAYERS
+model = Sequential()
+model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(256, 256, 3)))
+model.add(MaxPooling2D((2, 2)))
+
