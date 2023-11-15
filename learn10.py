@@ -1,11 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, Flatten, Dense
-from tensorflow.keras import layers, losses
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.models import Model
+import keras
+from keras import layers, losses
+from keras.datasets import mnist
+from keras.models import Model
 from tqdm import tqdm
+import os
 
 from convert_hz24_to_numpy import convert_hz24_to_numpy
 
@@ -23,9 +24,15 @@ print(x_test.shape)
 image_numbers = np.zeros((28, 280))
 image_numbers_24 = convert_hz24_to_numpy("０１２３４５６７８９０")
 for k in range(10):
+    # generate random number from 0 to 2
+    # pox = np.random.randint(0, 5)
+    # poy = np.random.randint(0, 5)
+    pox = 2
+    poy = 2
+
     for i in range(24):
         for j in range(24):
-            image_numbers[i + 2, j + 2 + k * 28] = image_numbers_24[i, j + k * 24]
+            image_numbers[i + pox, j + poy + k * 28] = image_numbers_24[i, j + k * 24]
 
 number_0 = image_numbers[:, :28]
 number_1 = image_numbers[:, 28:56]
@@ -90,6 +97,7 @@ class Autoencoder(Model):
             layers.MaxPooling2D((2, 2), padding='same'),
             layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
             layers.MaxPooling2D((2, 2), padding='same')
+
         ])
         self.decoder = tf.keras.Sequential([
             layers.Conv2D(8, (3, 3), activation='relu', padding='same'),
@@ -99,8 +107,10 @@ class Autoencoder(Model):
             layers.Conv2D(16, (3, 3), activation='relu'),
             layers.UpSampling2D((2, 2)),
             layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')
+
         ])
 
+    @tf.function
     def call(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
@@ -114,9 +124,22 @@ autoencoder = Autoencoder(latent_dim, shape)
 
 autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
 
+callbacks = [
+    keras.callbacks.EarlyStopping(
+        # Stop training when `val_loss` is no longer improving
+        monitor="val_loss",
+        # "no longer improving" being defined as "no better than 1e-2 less"
+        min_delta=1e-3,
+        # "no longer improving" being further defined as "for at least 2 epochs"
+        patience=5,
+        verbose=1,
+    )
+]
+
 autoencoder.fit(x_train, y_train_matrix,
-                epochs=10,
+                epochs=40,
                 shuffle=True,
+                callbacks=callbacks,
                 validation_data=(x_test, y_test_matrix))
 
 # train_encoded_imgs = autoencoder.encoder(x_train).numpy()
@@ -126,10 +149,43 @@ autoencoder.fit(x_train, y_train_matrix,
 # test_encoded_imgs = autoencoder.encoder(x_test).numpy()
 # test_decoded_imgs = autoencoder.decoder(test_encoded_imgs).numpy()
 # # test_decoded_imgs = (test_decoded_imgs > 0.5).astype(int)
-train_decoded_imgs = autoencoder(x_train).numpy()
-# train_decoded_imgs = (train_decoded_imgs > 0.5).astype(int)
-test_decoded_imgs = autoencoder(x_test).numpy()
+
 # test_decoded_imgs = (test_decoded_imgs > 0.5).astype(int)
+
+x_train_noisy = autoencoder(x_train)
+# train_decoded_imgs = (train_decoded_imgs > 0.5).astype(int)
+x_test_noisy = autoencoder(x_test)
+
+
+class Denoise(Model):
+    def __init__(self):
+        super(Denoise, self).__init__()
+        self.encoder = tf.keras.Sequential([
+            layers.Input(shape=(28, 28, 1)),
+            layers.Conv2D(16, (3, 3), activation='relu', padding='same', strides=2),
+            layers.Conv2D(8, (3, 3), activation='relu', padding='same', strides=2)])
+
+        self.decoder = tf.keras.Sequential([
+            layers.Conv2DTranspose(8, kernel_size=3, strides=2, activation='relu', padding='same'),
+            layers.Conv2DTranspose(16, kernel_size=3, strides=2, activation='relu', padding='same'),
+            layers.Conv2D(1, kernel_size=(3, 3), activation='sigmoid', padding='same')])
+
+    def call(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
+
+
+denoise = Denoise()
+
+denoise.compile(optimizer='adam', loss=losses.MeanSquaredError())
+
+denoise.fit(x_train_noisy, y_train_matrix,
+            epochs=10,
+            shuffle=True,
+            validation_data=(x_test_noisy, y_test_matrix))
+
+test_decoded_imgs = denoise(x_test_noisy).numpy()
 
 n = 10
 plt.figure(figsize=(20, 4))
